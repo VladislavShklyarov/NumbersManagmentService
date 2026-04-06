@@ -1,0 +1,175 @@
+services:
+
+  numbers-postgres-master:
+    image: bitnami/postgresql:latest
+    container_name: numbers-postgres-master
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRESQL_REPLICATION_MODE: master
+
+      # APP USER
+      POSTGRESQL_USERNAME: ${APP_DB_USER}
+      POSTGRESQL_PASSWORD: ${APP_DB_PASSWORD}
+      POSTGRESQL_DATABASE: ${APP_DB_NAME}
+
+      # REPLICATION
+      POSTGRESQL_REPLICATION_USER: ${REPL_DB_USER}
+      POSTGRESQL_REPLICATION_PASSWORD: ${REPL_DB_PASSWORD}
+
+
+      # SUPERUSER postgres
+      POSTGRESQL_POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD}
+
+      POSTGRESQL_SYNCHRONOUS_COMMIT: "off"
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - pg_master_data:/bitnami/postgresql
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    networks:
+      - numbers-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numbers_service -d numbers_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+
+  numbers-postgres-slave:
+    image: bitnami/postgresql:latest
+    container_name: numbers-postgres-slave
+
+    depends_on:
+      - numbers-postgres-master
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+
+      POSTGRESQL_MASTER_HOST: numbers-postgres-master
+      POSTGRESQL_MASTER_PORT_NUMBER: 5432
+
+      # SAME APP USER AS MASTER
+      POSTGRESQL_USERNAME: ${APP_DB_USER}
+      POSTGRESQL_PASSWORD: ${APP_DB_PASSWORD}
+      POSTGRESQL_DATABASE: ${APP_DB_NAME}
+
+      # REPLICATION
+      POSTGRESQL_REPLICATION_USER: ${REPL_DB_USER}
+      POSTGRESQL_REPLICATION_PASSWORD: ${REPL_DB_PASSWORD}
+      POSTGRESQL_POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD}
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - pg_slave_data:/bitnami/postgresql
+
+    networks:
+      - numbers-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numbers_service -d numbers_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+
+  numbers_service:
+    build:
+      context: .
+      dockerfile: infra/numbers_service/Dockerfile
+
+    container_name: numbers_service
+
+    depends_on:
+      numbers-postgres-master:
+        condition: service_healthy
+      numbers-postgres-slave:
+        condition: service_healthy
+
+    env_file:
+      - .env
+
+    environment:
+      NUMBERS_ENV: local
+
+      NUMBERS_HTTP_HOST: 0.0.0.0
+      NUMBERS_HTTP_PORT: 8080
+
+      NUMBERS_STORAGE_TYPE: postgres
+
+      # MASTER
+      NUMBERS_STORAGE_POSTGRES_MASTER_HOST: numbers-postgres-master
+      NUMBERS_STORAGE_POSTGRES_MASTER_PORT: 5432
+      NUMBERS_STORAGE_POSTGRES_MASTER_USER: ${APP_DB_USER}
+      NUMBERS_STORAGE_POSTGRES_MASTER_PASSWORD: ${APP_DB_PASSWORD}
+      NUMBERS_STORAGE_POSTGRES_MASTER_DBNAME: ${APP_DB_NAME}
+
+      NUMBERS_STORAGE_POSTGRES_MASTER_SSLMODE: disable
+
+      # SLAVE
+      NUMBERS_STORAGE_POSTGRES_SLAVE_HOST: numbers-postgres-slave
+      NUMBERS_STORAGE_POSTGRES_SLAVE_PORT: 5432
+
+      NUMBERS_STORAGE_POSTGRES_SLAVE_USER: ${APP_DB_USER}
+      NUMBERS_STORAGE_POSTGRES_SLAVE_PASSWORD: ${APP_DB_PASSWORD}
+      NUMBERS_STORAGE_POSTGRES_SLAVE_DBNAME: ${APP_DB_NAME}
+
+      NUMBERS_STORAGE_POSTGRES_SLAVE_SSLMODE: disable
+
+      # MIGRATIONS
+      NUMBERS_STORAGE_POSTGRES_MIGRATIONS_ENABLED: "true"
+      NUMBERS_STORAGE_POSTGRES_MIGRATIONS_PATH: "/app/migrations"
+
+      NUMBERS_PHONE_DEFAULT_COUNTRY_CODE: "RU"
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - numbers-network
+
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: numbers-pgadmin
+
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+
+    ports:
+      - "5050:80"
+
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./infra/pgadmin/servers.json:/pgadmin4/servers.json
+
+    depends_on:
+      - numbers-postgres-master
+      - numbers-postgres-slave
+
+    networks:
+      - numbers-network
+
+
+volumes:
+  pg_master_data:
+  pg_slave_data:
+  pgadmin_data:
+
+
+networks:
+  numbers-network:
+    driver: bridge

@@ -4,11 +4,28 @@ http:
   host: 0.0.0.0
   port: 8080
 
+phone:
+  default_country_code: "RU"
+
 storage:
+  type: postgres
   postgres:
-    host: localhost
-    port: 5432
-    user: postgres
-    password: postgres
-    dbname: phones
-    sslmode: disable
+    migrations:
+      enabled: true
+      path: /app/migrations
+
+    master:
+      host: numbers-postgres-master
+      port: 5432
+      user: numbers_service
+      password: numbers_pass
+      dbname: numbers_db
+      sslmode: disable
+
+    slave:
+      host: numbers-postgres-slave
+      port: 5432
+      user: numbers_service
+      password: numbers_pass
+      dbname: numbers_db
+      sslmode: disable

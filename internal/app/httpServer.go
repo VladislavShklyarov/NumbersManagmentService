@@ -3,6 +3,7 @@ package app
 import (
 	"NumbersManagmentService/internal/config"
 	"NumbersManagmentService/internal/transport"
+	"context"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
@@ -38,4 +39,16 @@ func NewHTTPServer(handler *transport.Handler, cfg config.HTTPConfig, logger *za
 func (s *HTTPServer) Run() error {
 	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 	return s.app.Listen(addr)
+}
+
+func (s *HTTPServer) Shutdown(ctx context.Context) error {
+	s.logger.Info("shutting down HTTP server")
+
+	if err := s.app.ShutdownWithContext(ctx); err != nil {
+		s.logger.Error("failed to shutdown fiber server", zap.Error(err))
+		return err
+	}
+
+	s.logger.Info("HTTP server stopped")
+	return nil
 }

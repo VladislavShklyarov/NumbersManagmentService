@@ -99,3 +99,7 @@ func containsSimple(s, sub string) bool {
 	}
 	return false
 }
+
+func (r *InMemoryRepo) Close() error {
+	return nil
+}

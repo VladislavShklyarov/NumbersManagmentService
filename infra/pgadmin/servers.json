@@ -1,0 +1,22 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Numbers Master",
+      "Host": "numbers-postgres-master",
+      "Port": 5432,
+      "Username": "numbers_admin",
+      "Password": "admin_password",
+      "MaintenanceDB": "numbers_db",
+      "SSLMode": "disable"
+    },
+    "2": {
+      "Name": "Numbers Slave",
+      "Host": "numbers-postgres-slave",
+      "Port": 5432,
+      "Username": "numbers_admin",
+      "Password": "admin_password",
+      "MaintenanceDB": "numbers_db",
+      "SSLMode": "disable"
+    }
+  }
+}
